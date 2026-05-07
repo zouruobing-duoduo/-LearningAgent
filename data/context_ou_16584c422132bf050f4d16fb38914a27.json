@@ -1,0 +1,10 @@
+{
+  "state": "diagnosing",
+  "current_topic": "Transformer与注意力机制",
+  "diagnosis_result": null,
+  "teaching_summary": null,
+  "difficulty_level": 3,
+  "retry_count": 0,
+  "last_bot_reply": "很高兴你想复习Transformer与注意力机制——这是个很有意思的话题。你是做大数据、机器学习和智能驾驶的，那我们先从一个看似简单但能触及本质的问题开始吧。\n\n第一个问题：**你觉得注意力机制的核心思想，和日常生活中我们处理信息的方式，有什么相通之处？** 比如，当你在嘈杂的咖啡馆里听朋友讲话时，你的大脑是怎么“集中注意力”的？不用太学术，用你自己的话来描述就行。",
+  "last_user_message": "复习"
+}

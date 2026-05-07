@@ -1,0 +1,23 @@
+# 环境变量（含密钥）
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 数据文件（运行时生成，不跟踪）
+data/chroma_db/
+data/temp_images/
+data/processed_messages.json
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

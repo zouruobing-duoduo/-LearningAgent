@@ -1,0 +1,135 @@
+[
+  {
+    "id": "t01",
+    "name": "第一性原理",
+    "description": "回归事物最基本的条件，从源头思考问题",
+    "category": "思维方法",
+    "difficulty": 1
+  },
+  {
+    "id": "t02",
+    "name": "熵增定律",
+    "description": "孤立系统的熵只增不减，万物趋向无序",
+    "category": "物理",
+    "difficulty": 2
+  },
+  {
+    "id": "t03",
+    "name": "能量守恒定律",
+    "description": "能量不会凭空产生或消失，只会转化",
+    "category": "物理",
+    "difficulty": 2
+  },
+  {
+    "id": "t04",
+    "name": "供需定律",
+    "description": "价格由供给和需求的平衡决定",
+    "category": "经济",
+    "difficulty": 1
+  },
+  {
+    "id": "t05",
+    "name": "复利效应",
+    "description": "微小的持续增长经过时间积累产生巨大变化",
+    "category": "数学",
+    "difficulty": 1
+  },
+  {
+    "id": "t06",
+    "name": "进化论（自然选择）",
+    "description": "适者生存，物种通过变异和选择不断演化",
+    "category": "生物",
+    "difficulty": 2
+  },
+  {
+    "id": "t07",
+    "name": "牛顿三定律",
+    "description": "描述物体运动规律的三条基本定律",
+    "category": "物理",
+    "difficulty": 2
+  },
+  {
+    "id": "t08",
+    "name": "概率与贝叶斯思维",
+    "description": "用概率更新认知，理性决策的基础",
+    "category": "数学",
+    "difficulty": 3
+  },
+  {
+    "id": "t09",
+    "name": "大数定律",
+    "description": "样本量足够大时，样本均值趋近于总体期望",
+    "category": "统计学",
+    "difficulty": 2
+  },
+  {
+    "id": "t10",
+    "name": "中心极限定理",
+    "description": "大量独立随机变量之和趋向正态分布，统计推断的基石",
+    "category": "统计学",
+    "difficulty": 3
+  },
+  {
+    "id": "t11",
+    "name": "正态分布",
+    "description": "自然界最普遍的分布，描述随机现象的钟形曲线",
+    "category": "统计学",
+    "difficulty": 2
+  },
+  {
+    "id": "t12",
+    "name": "回归分析",
+    "description": "用数学模型描述变量间的因果或相关关系",
+    "category": "统计学",
+    "difficulty": 3
+  },
+  {
+    "id": "t13",
+    "name": "假设检验",
+    "description": "用数据证据判断假设是否成立的科学方法",
+    "category": "统计学",
+    "difficulty": 3
+  },
+  {
+    "id": "t14",
+    "name": "方差与标准差",
+    "description": "衡量数据离散程度，理解不确定性的核心工具",
+    "category": "统计学",
+    "difficulty": 2
+  },
+  {
+    "id": "t15",
+    "name": "神经网络与反向传播",
+    "description": "模拟生物神经元的计算模型，通过梯度下降自动学习特征",
+    "category": "人工智能",
+    "difficulty": 3
+  },
+  {
+    "id": "t16",
+    "name": "梯度下降",
+    "description": "沿损失函数梯度方向迭代优化参数，机器学习的核心优化方法",
+    "category": "人工智能",
+    "difficulty": 3
+  },
+  {
+    "id": "t17",
+    "name": "过拟合与正则化",
+    "description": "模型过度记忆训练数据而丧失泛化能力，及其约束方法",
+    "category": "人工智能",
+    "difficulty": 2
+  },
+  {
+    "id": "t18",
+    "name": "Transformer与注意力机制",
+    "description": "通过自注意力捕捉序列全局依赖，大语言模型的基础架构",
+    "category": "人工智能",
+    "difficulty": 4
+  },
+  {
+    "id": "t19",
+    "name": "强化学习",
+    "description": "智能体通过与环境交互获得奖励信号来学习最优策略",
+    "category": "人工智能",
+    "difficulty": 4
+  }
+]

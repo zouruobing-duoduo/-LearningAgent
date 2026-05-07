@@ -1,0 +1,25 @@
+{
+  "learned": {
+    "t18": {
+      "name": "Transformer与注意力机制",
+      "mastery": 4,
+      "learned_at": "2026-04-18T10:41:55.874794",
+      "review_count": 0,
+      "last_review": "2026-04-18T10:41:55.874794"
+    }
+  },
+  "review_schedule": {
+    "t18": {
+      "date": "2026-04-19",
+      "review_round": 1
+    }
+  },
+  "topic_stats": {
+    "t18": {
+      "name": "Transformer与注意力机制",
+      "teaching_rounds": 22,
+      "exam_attempts": 1,
+      "exam_passed": true
+    }
+  }
+}
