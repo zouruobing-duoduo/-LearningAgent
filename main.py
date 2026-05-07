@@ -7,6 +7,8 @@ import sys
 import os
 import time
 import logging
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 # 将项目根目录加入 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -57,8 +59,33 @@ MAX_RESTART_ATTEMPTS = 0  # 0 = 无限重试
 RESTART_DELAY_BASE = 5    # 基础等待秒数
 RESTART_DELAY_MAX = 60    # 最大等待秒数
 
+# HTTP 健康检查（用于 HF Spaces 保活）
+HEALTH_PORT = int(os.environ.get("PORT", "7860"))
+
+
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.end_headers()
+        self.wfile.write(b"OK")
+
+    def log_message(self, format, *args):
+        pass  # 静默日志，避免刷屏
+
+
+def start_health_server():
+    """后台启动 HTTP 健康检查服务"""
+    server = HTTPServer(("0.0.0.0", HEALTH_PORT), HealthHandler)
+    t = threading.Thread(target=server.serve_forever, daemon=True)
+    t.start()
+    logger.info(f"健康检查服务启动: http://0.0.0.0:{HEALTH_PORT}")
+
 
 def main():
+    # 启动健康检查 HTTP 服务（HF Spaces 保活用）
+    start_health_server()
+
     attempt = 0
     while True:
         attempt += 1
