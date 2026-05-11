@@ -44,6 +44,10 @@ class FeishuClient:
         self._processed_message_ids: set[str] = self._load_dedup_cache()  # 从文件恢复
         self._max_cache_size = 200  # 最多缓存200条消息ID
 
+        # 内容去重：防止飞书用新message_id重推相同内容（保存最近消息的 user+text → 时间戳）
+        self._recent_content: dict[str, float] = {}  # key: "user_id|text_hash" → timestamp
+        self._content_dedup_window = 1800  # 30分钟内相同内容视为重复
+
         # 并发控制：防止同一用户的多条消息并行处理导致旧回复后发
         self._user_locks: dict[str, threading.Lock] = {}  # 每用户一把锁
         self._user_msg_seq: dict[str, int] = {}  # 每用户最新消息序号
@@ -74,8 +78,13 @@ class FeishuClient:
         )
 
     def _on_message_received(self, data: lark.im.v1.P2ImMessageReceiveV1) -> None:
-        """接收到消息的回调处理"""
+        """接收到消息的回调处理 — 快速返回以 ACK 事件，异步处理消息"""
         logger.info(f"收到事件回调, data type: {type(data)}")
+        # 在后台线程中处理消息，让回调快速返回（防止飞书19秒ACK超时重传）
+        threading.Thread(target=self._process_message, args=(data,), daemon=True).start()
+
+    def _process_message(self, data: lark.im.v1.P2ImMessageReceiveV1) -> None:
+        """实际的消息处理逻辑（在后台线程中执行）"""
         try:
             event = data.event
             if event is None:
@@ -126,6 +135,20 @@ class FeishuClient:
                 to_keep = list(self._processed_message_ids)[self._max_cache_size // 2:]
                 self._processed_message_ids = set(to_keep)
             self._save_dedup_cache()
+
+            # 内容去重：飞书可能用新 message_id 重推相同内容的消息
+            content_key = f"{user_id}|{hash(text)}"
+            now = time.time()
+            # 清理过期条目
+            self._recent_content = {
+                k: t for k, t in self._recent_content.items()
+                if now - t < self._content_dedup_window
+            }
+            if content_key in self._recent_content:
+                age = now - self._recent_content[content_key]
+                logger.info(f"跳过内容重复消息: {message_id}, 与前次相隔{age:.0f}s")
+                return
+            self._recent_content[content_key] = now
 
             # 群聊中需要@机器人才响应，去掉@前缀
             if chat_type == "group":
