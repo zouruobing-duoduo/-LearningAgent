@@ -4,6 +4,7 @@
 """
 import json
 import os
+import time
 import logging
 from typing import Callable, Optional
 
@@ -14,6 +15,8 @@ from lark_oapi.api.im.v1 import (
     ReplyMessageRequest,
     ReplyMessageRequestBody,
     DeleteMessageRequest,
+    UpdateMessageRequest,
+    UpdateMessageRequestBody,
     CreateImageRequest,
     CreateImageRequestBody,
 )
@@ -118,6 +121,16 @@ class FeishuClient:
                 self._processed_message_ids = set(to_keep)
             self._save_dedup_cache()
 
+            # 消息时间过滤：忽略超过120秒的旧消息（防止重启后处理积压事件）
+            try:
+                msg_create_time = int(message.create_time) / 1000  # 毫秒转秒
+                age_seconds = time.time() - msg_create_time
+                if age_seconds > 120:
+                    logger.info(f"跳过过旧消息: {message_id}, age={age_seconds:.0f}s")
+                    return
+            except (TypeError, ValueError):
+                pass  # 无法解析时间则继续处理
+
             # 群聊中需要@机器人才响应，去掉@前缀
             if chat_type == "group":
                 # 去掉可能的 @机器人 前缀
@@ -136,13 +149,27 @@ class FeishuClient:
             # 调用消息处理器
             reply_text = self._message_handler(user_id, text, message_id)
 
-            # 删除"思考中"状态消息
-            if thinking_msg_id:
-                self._delete_message(thinking_msg_id)
-
-            # 回复实际内容（支持图文混排）
-            if reply_text:
+            # 用编辑消息替换"思考中"为实际内容（避免"撤回了一条消息"提示）
+            if reply_text and thinking_msg_id:
+                # 检查回复是否包含图片标记
+                from core.reply_parser import parse_reply_with_images
+                has_images = bool(parse_reply_with_images(reply_text))
+                
+                if has_images:
+                    # 有图片则必须删除思考消息，用富文本重新回复
+                    self._delete_message(thinking_msg_id)
+                    self._send_reply(message_id, reply_text)
+                else:
+                    # 纯文本：直接编辑消息内容
+                    updated = self._update_message(thinking_msg_id, reply_text)
+                    if not updated:
+                        # 编辑失败则删除思考中消息，重新回复
+                        self._delete_message(thinking_msg_id)
+                        self._send_reply(message_id, reply_text)
+            elif reply_text:
                 self._send_reply(message_id, reply_text)
+            elif thinking_msg_id:
+                self._delete_message(thinking_msg_id)
 
         except Exception as e:
             logger.error(f"处理消息失败: {e}", exc_info=True)
@@ -171,6 +198,31 @@ class FeishuClient:
         except Exception as e:
             logger.error(f"回复消息异常: {e}", exc_info=True)
             return None
+
+    def _update_message(self, message_id: str, text: str) -> bool:
+        """编辑已发送的消息内容（替代撤回+重发，避免'撤回了一条消息'提示）"""
+        try:
+            request = (
+                UpdateMessageRequest.builder()
+                .message_id(message_id)
+                .request_body(
+                    UpdateMessageRequestBody.builder()
+                    .msg_type("text")
+                    .content(json.dumps({"text": text}))
+                    .build()
+                )
+                .build()
+            )
+            response = self._api_client.im.v1.message.update(request)
+            if response.success():
+                logger.info(f"编辑消息成功: {message_id}")
+                return True
+            else:
+                logger.warning(f"编辑消息失败: code={response.code}, msg={response.msg}")
+                return False
+        except Exception as e:
+            logger.warning(f"编辑消息异常: {e}")
+            return False
 
     def _delete_message(self, message_id: str):
         """撤回/删除消息"""
