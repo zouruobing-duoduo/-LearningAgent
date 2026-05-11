@@ -5,6 +5,7 @@
 import json
 import os
 import time
+import threading
 import logging
 from typing import Callable, Optional
 
@@ -42,6 +43,11 @@ class FeishuClient:
         self._message_handler = message_handler
         self._processed_message_ids: set[str] = self._load_dedup_cache()  # 从文件恢复
         self._max_cache_size = 200  # 最多缓存200条消息ID
+
+        # 并发控制：防止同一用户的多条消息并行处理导致旧回复后发
+        self._user_locks: dict[str, threading.Lock] = {}  # 每用户一把锁
+        self._user_msg_seq: dict[str, int] = {}  # 每用户最新消息序号
+        self._global_lock = threading.Lock()  # 保护上面两个字典的访问
 
         # 创建 API 客户端（用于主动调用 API）
         self._api_client = (
@@ -121,16 +127,6 @@ class FeishuClient:
                 self._processed_message_ids = set(to_keep)
             self._save_dedup_cache()
 
-            # 消息时间过滤：忽略超过120秒的旧消息（防止重启后处理积压事件）
-            try:
-                msg_create_time = int(message.create_time) / 1000  # 毫秒转秒
-                age_seconds = time.time() - msg_create_time
-                if age_seconds > 120:
-                    logger.info(f"跳过过旧消息: {message_id}, age={age_seconds:.0f}s")
-                    return
-            except (TypeError, ValueError):
-                pass  # 无法解析时间则继续处理
-
             # 群聊中需要@机器人才响应，去掉@前缀
             if chat_type == "group":
                 # 去掉可能的 @机器人 前缀
@@ -143,33 +139,55 @@ class FeishuClient:
 
             logger.info(f"收到消息: user={user_id}, text={text[:50]}")
 
-            # 立即发送"思考中"状态提示
-            thinking_msg_id = self._reply_message(message_id, "💭 思考中...")
+            # 并发控制：获取用户锁 + 递增序号
+            with self._global_lock:
+                if user_id not in self._user_locks:
+                    self._user_locks[user_id] = threading.Lock()
+                self._user_msg_seq[user_id] = self._user_msg_seq.get(user_id, 0) + 1
+                my_seq = self._user_msg_seq[user_id]
+                user_lock = self._user_locks[user_id]
 
-            # 调用消息处理器
-            reply_text = self._message_handler(user_id, text, message_id)
+            # 获取用户锁，确保同一用户的消息串行处理
+            with user_lock:
+                # 再次检查：如果等待锁期间有更新的消息到达，放弃处理本条
+                if self._user_msg_seq[user_id] != my_seq:
+                    logger.info(f"放弃过期消息(等锁期间有新消息): {message_id}, seq={my_seq}")
+                    return
 
-            # 用编辑消息替换"思考中"为实际内容（避免"撤回了一条消息"提示）
-            if reply_text and thinking_msg_id:
-                # 检查回复是否包含图片标记
-                from core.reply_parser import parse_reply_with_images
-                has_images = bool(parse_reply_with_images(reply_text))
-                
-                if has_images:
-                    # 有图片则必须删除思考消息，用富文本重新回复
-                    self._delete_message(thinking_msg_id)
-                    self._send_reply(message_id, reply_text)
-                else:
-                    # 纯文本：直接编辑消息内容
-                    updated = self._update_message(thinking_msg_id, reply_text)
-                    if not updated:
-                        # 编辑失败则删除思考中消息，重新回复
+                # 立即发送"思考中"状态提示
+                thinking_msg_id = self._reply_message(message_id, "💭 思考中...")
+
+                # 调用消息处理器
+                reply_text = self._message_handler(user_id, text, message_id)
+
+                # 处理完毕后检查：如果处理期间有更新的消息到达，放弃发送回复
+                if self._user_msg_seq[user_id] != my_seq:
+                    logger.info(f"放弃过期回复(处理期间有新消息): {message_id}, seq={my_seq}")
+                    if thinking_msg_id:
+                        self._delete_message(thinking_msg_id)
+                    return
+
+                # 用编辑消息替换"思考中"为实际内容（避免"撤回了一条消息"提示）
+                if reply_text and thinking_msg_id:
+                    # 检查回复是否包含图片标记
+                    from core.reply_parser import parse_reply_with_images
+                    has_images = bool(parse_reply_with_images(reply_text))
+                    
+                    if has_images:
+                        # 有图片则必须删除思考消息，用富文本重新回复
                         self._delete_message(thinking_msg_id)
                         self._send_reply(message_id, reply_text)
-            elif reply_text:
-                self._send_reply(message_id, reply_text)
-            elif thinking_msg_id:
-                self._delete_message(thinking_msg_id)
+                    else:
+                        # 纯文本：直接编辑消息内容
+                        updated = self._update_message(thinking_msg_id, reply_text)
+                        if not updated:
+                            # 编辑失败则删除思考中消息，重新回复
+                            self._delete_message(thinking_msg_id)
+                            self._send_reply(message_id, reply_text)
+                elif reply_text:
+                    self._send_reply(message_id, reply_text)
+                elif thinking_msg_id:
+                    self._delete_message(thinking_msg_id)
 
         except Exception as e:
             logger.error(f"处理消息失败: {e}", exc_info=True)
